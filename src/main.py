@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 
 from src.models import IssueCreate, IssueResponse
 
@@ -36,3 +36,15 @@ def create_issue(issue: IssueCreate) -> IssueResponse:
     issues[created_issue.id] = created_issue
 
     return created_issue
+
+@app.get("/issues/{issue_id}", response_model=IssueResponse)
+def get_issue(issue_id: str) -> IssueResponse:
+    saved_issue = issues.get(issue_id)
+
+    if saved_issue is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found",
+        )
+
+    return saved_issue
