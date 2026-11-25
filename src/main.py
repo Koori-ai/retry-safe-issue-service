@@ -11,6 +11,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+issues: dict[str, IssueResponse] = {}
 
 @app.get("/health")
 def health_check() -> dict[str, str]:
