@@ -24,7 +24,7 @@ def health_check() -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
 )
 def create_issue(issue: IssueCreate) -> IssueResponse:
-    return IssueResponse(
+    created_issue = IssueResponse(
         id=str(uuid4()),
         title=issue.title,
         description=issue.description,
@@ -32,3 +32,7 @@ def create_issue(issue: IssueCreate) -> IssueResponse:
         status="open",
         created_at=datetime.now(timezone.utc),
     )
+
+    issues[created_issue.id] = created_issue
+
+    return created_issue
