@@ -17,3 +17,8 @@ class IssueResponse(BaseModel):
     priority: Literal["low", "medium", "high"]
     status: Literal["open"]
     created_at: datetime
+
+
+class IdempotencyRecord(BaseModel):
+    request_hash: str
+    issue: IssueResponse
