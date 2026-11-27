@@ -1,9 +1,11 @@
+import hashlib
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, status
 
-from src.models import IssueCreate, IssueResponse
+from src.models import IdempotencyRecord, IssueCreate, IssueResponse
 
 
 app = FastAPI(
@@ -12,7 +14,21 @@ app = FastAPI(
 )
 
 issues: dict[str, IssueResponse] = {}
-idempotency_records: dict[str, IssueResponse] = {}
+idempotency_records: dict[str, IdempotencyRecord] = {}
+
+
+def calculate_request_hash(issue: IssueCreate) -> str:
+    request_data = {
+        "title": issue.title,
+        "description": issue.description,
+        "priority": issue.priority,
+    }
+    canonical_request = json.dumps(
+        request_data,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
 
 
 @app.get("/health")
@@ -29,10 +45,17 @@ def create_issue(
     issue: IssueCreate,
     idempotency_key: str = Header(alias="Idempotency-Key"),
 ) -> IssueResponse:
-    existing_issue = idempotency_records.get(idempotency_key)
+    request_hash = calculate_request_hash(issue)
+    existing_record = idempotency_records.get(idempotency_key)
 
-    if existing_issue is not None:
-        return existing_issue
+    if existing_record is not None:
+        if existing_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency-Key has already been used with different request data",
+            )
+
+        return existing_record.issue
 
     created_issue = IssueResponse(
         id=str(uuid4()),
@@ -44,7 +67,10 @@ def create_issue(
     )
 
     issues[created_issue.id] = created_issue
-    idempotency_records[idempotency_key] = created_issue
+    idempotency_records[idempotency_key] = IdempotencyRecord(
+        request_hash=request_hash,
+        issue=created_issue,
+    )
 
     return created_issue
 
