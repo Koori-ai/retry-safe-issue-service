@@ -13,11 +13,11 @@ def test_get_existing_issue() -> None:
         "priority": "high",
     }
 
-   create_response = client.post(
-    "/issues",
-    json=create_payload,
-    headers={"Idempotency-Key": "test-get-existing-issue-001"},
-)
+    create_response = client.post(
+        "/issues",
+        json=create_payload,
+        headers={"Idempotency-Key": "test-get-existing-issue-001"},
+    )
     created_issue = create_response.json()
 
     get_response = client.get(f"/issues/{created_issue['id']}")
