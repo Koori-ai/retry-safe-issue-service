@@ -1,11 +1,9 @@
-import hashlib
-import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, status
 
-from src.models import IdempotencyRecord, IssueCreate, IssueResponse
+from src.models import IssueCreate, IssueResponse
 
 
 app = FastAPI(
@@ -13,26 +11,18 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Temporary in-memory storage for the learning MVP.
+# This data disappears whenever the API service restarts.
 issues: dict[str, IssueResponse] = {}
-idempotency_records: dict[str, IdempotencyRecord] = {}
 
-
-def calculate_request_hash(issue: IssueCreate) -> str:
-    request_data = {
-        "title": issue.title,
-        "description": issue.description,
-        "priority": issue.priority,
-    }
-    canonical_request = json.dumps(
-        request_data,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+# Maps an Idempotency-Key value to the first issue created with that key.
+# We will later store a request hash here to detect conflicting key reuse.
+idempotency_records: dict[str, IssueResponse] = {}
 
 
 @app.get("/health")
 def health_check() -> dict[str, str]:
+    """Return a basic indication that the API process is responding."""
     return {"status": "ok"}
 
 
@@ -45,18 +35,13 @@ def create_issue(
     issue: IssueCreate,
     idempotency_key: str = Header(alias="Idempotency-Key"),
 ) -> IssueResponse:
-    request_hash = calculate_request_hash(issue)
-    existing_record = idempotency_records.get(idempotency_key)
+    # A repeated key returns the original issue instead of creating a duplicate.
+    existing_issue = idempotency_records.get(idempotency_key)
 
-    if existing_record is not None:
-        if existing_record.request_hash != request_hash:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Idempotency-Key has already been used with different request data",
-            )
+    if existing_issue is not None:
+        return existing_issue
 
-        return existing_record.issue
-
+    # Server-managed fields prevent clients from controlling IDs or timestamps.
     created_issue = IssueResponse(
         id=str(uuid4()),
         title=issue.title,
@@ -66,17 +51,18 @@ def create_issue(
         created_at=datetime.now(timezone.utc),
     )
 
+    # Store the issue by its server-generated ID for GET /issues/{issue_id}.
     issues[created_issue.id] = created_issue
-    idempotency_records[idempotency_key] = IdempotencyRecord(
-        request_hash=request_hash,
-        issue=created_issue,
-    )
+
+    # Store the original result under the request key for safe client retries.
+    idempotency_records[idempotency_key] = created_issue
 
     return created_issue
 
 
 @app.get("/issues/{issue_id}")
 def get_issue(issue_id: str) -> IssueResponse:
+    """Return a stored issue or a clear 404 response when it does not exist."""
     saved_issue = issues.get(issue_id)
 
     if saved_issue is None:
