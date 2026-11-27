@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException, statuss
+from fastapi import FastAPI, Header, HTTPException, status
 
 from src.models import IssueCreate, IssueResponse
 
@@ -13,6 +13,7 @@ app = FastAPI(
 
 issues: dict[str, IssueResponse] = {}
 
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
@@ -23,7 +24,6 @@ def health_check() -> dict[str, str]:
     response_model=IssueResponse,
     status_code=status.HTTP_201_CREATED,
 )
-
 def create_issue(
     issue: IssueCreate,
     idempotency_key: str = Header(alias="Idempotency-Key"),
@@ -41,7 +41,8 @@ def create_issue(
 
     return created_issue
 
-@app.get("/issues/{issue_id}", response_model=IssueResponse)
+
+@app.get("/issues/{issue_id}")
 def get_issue(issue_id: str) -> IssueResponse:
     saved_issue = issues.get(issue_id)
 
