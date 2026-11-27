@@ -29,6 +29,11 @@ def create_issue(
     issue: IssueCreate,
     idempotency_key: str = Header(alias="Idempotency-Key"),
 ) -> IssueResponse:
+    existing_issue = idempotency_records.get(idempotency_key)
+
+    if existing_issue is not None:
+        return existing_issue
+
     created_issue = IssueResponse(
         id=str(uuid4()),
         title=issue.title,
@@ -39,6 +44,7 @@ def create_issue(
     )
 
     issues[created_issue.id] = created_issue
+    idempotency_records[idempotency_key] = created_issue
 
     return created_issue
 
