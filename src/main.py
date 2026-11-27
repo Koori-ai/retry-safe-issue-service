@@ -12,6 +12,7 @@ app = FastAPI(
 )
 
 issues: dict[str, IssueResponse] = {}
+idempotency_records: dict[str, IssueResponse] = {}
 
 
 @app.get("/health")
