@@ -13,11 +13,12 @@ def test_create_issue() -> None:
         "priority": "high",
     }
 
-   response = client.post(
-    "/issues",
-    json=payload,
-    headers={"Idempotency-Key": "test-create-issue-001"},
-)
+    response = client.post(
+        "/issues",
+        json=payload,
+        headers={"Idempotency-Key": "test-create-issue-001"},
+    )
+
     assert response.status_code == 201
 
     body = response.json()
